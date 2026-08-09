@@ -90,6 +90,9 @@ Options (both modes):
                        via HTTPS).
   --memory LIMIT       Podman memory limit (default: 8g). Caps container
                        memory to prevent host OOM kills on long sessions.
+  --rate-limit SECONDS Sleep SECONDS before each execute_code_local/remote call.
+                       Crude rate limiting for autonomous pentesting against real targets.
+                       Default: no rate limiting.
   --no-containers      Disable all sidecar containers (overrides #+CONTAINERS).
                        Useful for debugging the Emacs container in isolation.
   --container-image T:I Override container image for target T with image I.
@@ -176,6 +179,7 @@ SELF_MODIFICATION=0
 MEMORY_LIMIT="8g"
 NO_CONTAINERS=0
 CONTAINER_IMAGE_OVERRIDES=()
+RATE_LIMIT=""
 MOUNT_ARGS=()
 MOUNT_RO_ARGS=()
 KNOWLEDGE_LABELS=()
@@ -314,6 +318,11 @@ while [[ $# -gt 0 ]]; do
         --container-image)
             [[ $# -lt 2 ]] && error "--container-image requires a value (target:image)" && exit 1
             CONTAINER_IMAGE_OVERRIDES+=("$2")
+            shift 2
+            ;;
+        --rate-limit)
+            [[ $# -lt 2 ]] && error "--rate-limit requires a value (seconds)" && exit 1
+            RATE_LIMIT="$2"
             shift 2
             ;;
         --help|-h)
@@ -824,6 +833,7 @@ build_podman_args() {
         -e "HUMAN_MATRIX_TOKEN=${HUMAN_MATRIX_TOKEN:-}" \
         $([[ -n "${GPTEL_FORK_PATH}" ]] && echo "-v ${GPTEL_FORK_PATH}:/root/.emacs.d/gptel-fork:z -e EMACBOROS_GPTEL_FORK_PATH=/root/.emacs.d/gptel-fork") \
         $([[ "${SELF_MODIFICATION:-0}" -eq 1 ]] && echo "-e EMACBOROS_SELF_MODIFICATION=1") \
+        $([[ -n "${RATE_LIMIT}" ]] && echo "-e IAR_RATE_LIMIT=${RATE_LIMIT}") \
         -e "IAR_PROJECT=${PROJECT_NAME}" \
         $([[ -n "${EXTRA_MOUNTS_ENV}" ]] && echo "-e IAR_EXTRA_MOUNTS=${EXTRA_MOUNTS_ENV}") \
         -e "LANG=C.utf8" \

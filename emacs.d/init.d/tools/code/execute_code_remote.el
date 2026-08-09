@@ -19,6 +19,7 @@
 (require 'iar-tool-call)
 (require 'iar-utils)
 (require 'subr-x)
+(require 'iar-rate-limit)
 
 ;; Declared in configs/paths.el (loaded before init.d modules).
 (defvar iar-personalization-path nil
@@ -120,6 +121,8 @@ TIMEOUT in seconds (default 3600)."
          (timer nil)
          (proc nil)
          (sanitize-output (bound-and-true-p iar--sanitize-exec-output)))
+    ;; Rate limit: sleep before exec if enabled
+    (iar--rate-limit-maybe-sleep)
     (setq proc
           (condition-case err
               (make-process
@@ -177,6 +180,8 @@ Uses call-process via make-process with explicit argv (no shell)."
          (timer nil)
          (proc nil)
          (sanitize-output (bound-and-true-p iar--sanitize-exec-output)))
+    ;; Rate limit: sleep before exec if enabled
+    (iar--rate-limit-maybe-sleep)
     (setq proc
           (condition-case err
               (make-process

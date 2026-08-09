@@ -18,6 +18,7 @@
 
 (require 'iar-tool-call)
 (require 'iar-output-sanitizer)
+(require 'iar-rate-limit)
 
 (defun iar--async-shell-command (callback command &optional timeout)
   "Run COMMAND asynchronously, returning result via CALLBACK.
@@ -37,6 +38,8 @@ needed."
          (timer nil)
          (proc nil)
          (sanitize-output (bound-and-true-p iar--sanitize-exec-output)))
+    ;; Rate limit: sleep before exec if enabled
+    (iar--rate-limit-maybe-sleep)
     (setq proc
           (condition-case err
               (make-process

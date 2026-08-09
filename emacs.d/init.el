@@ -111,6 +111,10 @@
 ;; (which injects mount info into the system prompt).
 (load (expand-file-name "iar-mount-awareness.el" init-core-dir))
 
+;; Rate limiter -- sleep before execute_code_local/remote calls
+;; Must load before execute_code_local.el and execute_code_remote.el
+(load (expand-file-name "iar-rate-limit.el" init-core-dir))
+
 ;; ──────────────────────────────────────────────────────────
 ;; Security modules
 ;; ──────────────────────────────────────────────────────────
