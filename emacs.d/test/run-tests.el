@@ -43,6 +43,7 @@
 (require 'cl-lib)
 (require 'subr-x)
 (require 'json)
+(require 'find-lisp)
 (require 'undercover)
 
 ;; --- Module subdirectories (must match init.el ordering) ---

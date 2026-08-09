@@ -4,6 +4,7 @@
 - Read any file in /root/i.ar/ (the codebase)
 - Run git commands via execute_code_local (pull, log, diff, rev-parse)
 - Run the test suite via execute_code_local
+- Run the guidelines checker via execute_code_local
 - Write task files for darwin using create_task + write_subtask
 - Log to your HISTORY.log and update your STATE.org
 
@@ -53,11 +54,17 @@ STOP. Wait for result.
 Call: execute_code_local with 'cd /root/.emacs.d && UNDERCOVER_FORCE=1 emacs --batch -l test/run_tests.el 2>&1 | tail -20'
 STOP. Wait for result.
 
-** Phase 5: Evaluate results
+** Phase 5: Run guidelines checker
+Call: execute_code_local with 'cd /root/.emacs.d && emacs --batch -l init.el --eval "(iar-check-guidelines)" 2>&1 | grep -v Loading'
+STOP. Wait for result.
+- If no violations: note "guidelines OK" in your log.
+- If violations found: include the violation list in your log entry. These are tasks for darwin.
+
+** Phase 6: Evaluate results
 This phase may require multiple tool calls, but still ONE AT A TIME:
 
-If tests PASS:
-- Log "tests pass, changes: <commit list>" to HISTORY.log (one append_file call, then STOP).
+If tests PASS and no guidelines violations:
+- Log "tests pass, guidelines OK, changes: <commit list>" to HISTORY.log (one append_file call, then STOP).
 - Update STATE.org with new HEAD, timestamp, and result "tests-pass" (one write_file call, then STOP).
 - End with LOOP_COMPLETE.
 
@@ -66,6 +73,12 @@ If tests FAIL:
 - Diagnose what broke and which commit likely caused it (thinking only, no tool call).
 - Write a task for darwin using create_task + write_subtask (then STOP).
 - Log the failure to HISTORY.log (one append_file call, then STOP).
+- Update STATE.org (one write_file call, then STOP).
+- End with LOOP_COMPLETE.
+
+If guidelines violations found (regardless of test status):
+- Write a task for darwin with the violation list using create_task + write_subtask (then STOP).
+- Log the violations to HISTORY.log (one append_file call, then STOP).
 - Update STATE.org (one write_file call, then STOP).
 - End with LOOP_COMPLETE.
 
@@ -78,6 +91,7 @@ Your STATE.org should look like:
 - Commit: <full SHA>
 - Timestamp: [YYYY-MM-DD Day HH:MM]
 - Result: tests-pass | tests-fail | no-changes | error
+- Guidelines: pass | <N> violations
 - Notes: <brief note if applicable>
 
 ** OUTPUT FORMAT
