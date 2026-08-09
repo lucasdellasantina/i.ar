@@ -1,0 +1,37 @@
+FROM quay.io/fedora/fedora-minimal:42
+
+ENV LANG=C.utf8
+
+# Purpose: Life organization and personal finance management.
+# No outbound internet access. Personal data mounted at /life-org.
+# Shared workspace at /workspace is the file bridge to Emacs container.
+#
+# Tools:
+#   hledger   -- plain-text accounting, financial reports, balance sheets
+#   Ruby      -- scripting, data processing, custom reports
+#   jq        -- JSON processing (for structured data files)
+#   bash      -- shell scripting
+
+RUN microdnf update -y && \
+    microdnf install -y \
+        bash \
+        coreutils \
+        findutils \
+        hledger \
+        ruby \
+        jq \
+        sed \
+        grep \
+        gawk \
+        tar \
+        gzip \
+        unzip \
+    && microdnf clean all
+
+# Unprivileged user for all operations
+RUN useradd -m -s /bin/bash lifeorg
+WORKDIR /workspace
+USER lifeorg
+
+# Default entrypoint: sleep keeps container alive for podman exec
+ENTRYPOINT ["sleep", "infinity"]
