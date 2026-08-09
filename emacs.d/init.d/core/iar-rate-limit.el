@@ -47,11 +47,15 @@ Called at module load time. Does nothing if env var is not set."
 (defun iar--rate-limit-maybe-sleep ()
   "Sleep for `iar-rate-limit-seconds' if rate limiting is enabled.
 Returns t if a sleep was performed, nil otherwise.
-The sleep uses `sit-for' so Emacs stays responsive during the wait."
+Uses `sleep-for' (not `sit-for') because this function is called from
+gptel's async tool dispatch, which runs in a process filter context.
+`sit-for' processes events while waiting, which is unsafe in process
+filters -- it can cause recursive event processing or indefinite hangs.
+`sleep-for' does a pure blocking sleep without touching the event loop."
   (when (and (integerp iar-rate-limit-seconds)
              (> iar-rate-limit-seconds 0))
     (message "[rate-limit] Sleeping %ds before exec..." iar-rate-limit-seconds)
-    (sit-for iar-rate-limit-seconds)
+    (sleep-for iar-rate-limit-seconds)
     t))
 
 (defun iar-rate-limit-set (seconds)
