@@ -135,6 +135,7 @@
 
 ;; Code execution tools
 (load (expand-file-name "execute_code_local.el" init-tools-code-dir))
+(load (expand-file-name "execute_code_remote.el" init-tools-code-dir))
 (load (expand-file-name "check_elisp.el" init-tools-code-dir))
 
 ;; Task tools (one tool per file)

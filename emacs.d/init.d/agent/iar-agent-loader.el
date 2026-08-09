@@ -13,6 +13,7 @@
 ;; - Mode-based memory injection (LOGS.md or STATE.org)
 ;; - Auto-loading project knowledge
 ;; - Tool gating via #+TOOLS metadata
+;; - Container injection via #+CONTAINERS metadata
 
 (require 'cl-lib)
 (require 'subr-x)
@@ -43,6 +44,10 @@
 (defvar iar--knowledge-base-prompt nil)
 (defvar iar--knowledge-loaded-labels nil)
 (defvar iar--knowledge-blocks nil)
+
+;; Declared in execute_code_remote.el.
+(defvar iar--current-containers nil
+  "List of container target names available in the current session.")
 
 ;;; --- Agent state variables ---
 
@@ -76,6 +81,7 @@ Set buffer-local by `iar-load-agent'. Kept for backward compat.")
     ("librarian" . "continuous")
     ("davinci" . "interactive")
     ("colin" . "interactive")
+    ("iar" . "interactive")
     ("agent-assistant" . "agent-assistant")
     ("implementer" . "implementer")
     ("reviewer" . "reviewer"))
@@ -126,6 +132,8 @@ Returns the assembled plist."
     (setq-local iar--current-personality personality)
     (setq-local iar--current-project project)
     (setq-local iar--current-mode (plist-get result :mode))
+    ;; Container targets from #+CONTAINERS (used by execute_code_remote)
+    (setq-local iar--current-containers (plist-get result :containers))
     ;; Backward compat: agent-name = personality name
     (setq-local iar--current-agent-name personality)
     (setq iar--current-agent-name personality)

@@ -111,4 +111,34 @@
   (let ((result (iar--load-or-create-project "iar")))
     (should (string= (plist-get result :name) "iar"))))
 
+;;; --- #+CONTAINERS parsing tests ---
+
+(ert-deftest test-project-parser-parse-metadata-containers ()
+  "Parse #+CONTAINERS line correctly."
+  (let ((meta (iar--parse-project-metadata
+               "#+KNOWLEDGE: iar/\n#+TOOLS: read_file\n#+CONTAINERS: pentest concepts\n#+OBJECTIVE: Test")))
+    (should (equal (plist-get meta :containers) '("pentest" "concepts")))))
+
+(ert-deftest test-project-parser-parse-metadata-containers-missing ()
+  "Missing #+CONTAINERS returns nil."
+  (let ((meta (iar--parse-project-metadata
+               "#+KNOWLEDGE: iar/\n#+TOOLS: read_file\n#+OBJECTIVE: Test")))
+    (should (null (plist-get meta :containers)))))
+
+(ert-deftest test-project-parser-parse-metadata-containers-single ()
+  "Parse single container target."
+  (let ((meta (iar--parse-project-metadata
+               "#+CONTAINERS: pentest\n#+OBJECTIVE: Test")))
+    (should (equal (plist-get meta :containers) '("pentest")))))
+
+(ert-deftest test-project-parser-parse-metadata-all-fields ()
+  "Parse all metadata fields including containers."
+  (let ((meta (iar--parse-project-metadata
+               "#+KNOWLEDGE: iar/ infra/\n#+TOOLS: read_file write_file\n#+MOUNTS: /path:rw\n#+CONTAINERS: pentest concepts life-org\n#+OBJECTIVE: Full project")))
+    (should (equal (plist-get meta :knowledge) '("iar/" "infra/")))
+    (should (equal (plist-get meta :tools) '("read_file" "write_file")))
+    (should (equal (plist-get meta :containers) '("pentest" "concepts" "life-org")))
+    (should (string= (plist-get meta :objective) "Full project"))))
+
 (provide 'test-project-parser)
+;;; test-project-parser.el ends here

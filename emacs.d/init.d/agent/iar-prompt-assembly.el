@@ -5,7 +5,7 @@
 ;; Assembles a complete system prompt from three primitives:
 ;; 1. Archetype (behavioral mode) -- from agents.d/archetypes/<name>.org
 ;; 2. Personality (voice/character) -- from agents.d/personalities/<name>.org
-;; 3. Project (knowledge + tools + objective) -- from personalization/projects/<name>.org
+;; 3. Project (knowledge + tools + objective + containers) -- from personalization/projects/<name>.org
 ;;
 ;; Assembly order (top to bottom of prompt):
 ;; 1. base_context.org (expanded #+INCLUDE)
@@ -15,6 +15,7 @@
 ;; 5. Auto-loaded knowledge (from project #+KNOWLEDGE)
 ;; 6. Memory injection (mode-based: LOGS.md or STATE.org)
 ;; 7. Mount info
+;; 8. Available containers (from project #+CONTAINERS)
 ;;
 ;; Memory injection is determined by the archetype's #+MODE: metadata:
 ;; - interactive -> inject LOGS.md (last N lines)
@@ -50,6 +51,31 @@
 (defvar iar-knowledge-open-delimiter nil)
 (defvar iar-knowledge-close-delimiter nil)
 (defvar iar-knowledge-file-separator nil)
+
+;;; --- Container descriptions ---
+
+(defconst iar--container-descriptions
+  '(("pentest" . "nmap, curl, python3, openssl, whois, traceroute, tcpdump. Outbound internet. No personal data.")
+    ("concepts" . "Maxima, ngspice, iverilog, gnuplot, Ruby, gcc. Concepts directory mounted. No outbound internet.")
+    ("life-org" . "hledger, Ruby. Personal data mounted. No outbound internet.")
+    ("debug" . "bash, journalctl, systemctl, standard debug tools. Host root filesystem mounted read-only. SSH over WireGuard."))
+  "Alist mapping container target names to brief descriptions.
+Used for prompt injection so the agent knows what each container offers.
+Hardcoded for now -- move to metadata files when there are more than ~10.")
+
+(defun iar--format-containers (containers)
+  "Format CONTAINERS list into a prompt injection block.
+Returns a string with available container targets and descriptions,
+or empty string if CONTAINERS is nil/empty."
+  (if (or (null containers) (not containers))
+      ""
+    (let ((lines nil))
+      (dolist (target containers)
+        (let ((desc (or (cdr (assoc target iar--container-descriptions))
+                        "Unknown container type.")))
+          (push (format "%s: %s" target desc) lines)))
+      (format "\n\n=== AVAILABLE CONTAINERS ===\n%s\n=== END CONTAINERS ==="
+              (mapconcat #'identity (nreverse lines) "\n")))))
 
 ;;; --- Archetype reading ---
 
@@ -122,23 +148,20 @@ Truncates to last N lines if iar-personal-file-max-lines is set."
                    (> (count-lines (point-min) (point-max))
                       iar-personal-file-max-lines))
               (let* ((total-lines (count-lines (point-min) (point-max)))
-                     (max-lines iar-personal-file-max-lines))
-                (goto-char (point-min))
-                (forward-line (- total-lines max-lines))
-                (let ((truncated-content
-                       (string-trim (buffer-substring-no-properties (point) (point-max)))))
-                  (format "[... %d lines truncated, showing last %d lines ...]\n\n%s"
-                          (- total-lines max-lines) max-lines truncated-content)))
-            (string-trim (buffer-string))))
+                     (start-line (1+ (- total-lines iar-personal-file-max-lines))))
+                (forward-line start-line)
+                (buffer-substring (point) (point-max)))
+            (buffer-string)))
       "")))
 
 (defun iar--inject-memory (mode personality-name)
-  "Return memory injection string based on MODE and PERSONALITY-NAME.
-- interactive: LOGS.md (last N lines)
-- autonomous: STATE.org (full)
-- continuous: STATE.org (full)
-- delegated: empty string (no memory)
-- one-shot: empty string (no memory)"
+  "Inject memory for the given MODE and PERSONALITY-NAME.
+Returns a string to append to the prompt, or empty string.
+- interactive -> inject LOGS.md (last N lines)
+- autonomous -> inject STATE.org (full)
+- continuous -> inject STATE.org (full)
+- delegated -> no memory injection
+- one-shot -> no memory injection"
   (pcase mode
     ('interactive
      (let ((logs (iar--read-memory-file personality-name "LOGS.md")))
@@ -146,7 +169,13 @@ Truncates to last N lines if iar-personal-file-max-lines is set."
            (format "\n\n=== SESSION LOGS [%s] ===\n\n%s\n\n=== END SESSION LOGS ==="
                    personality-name logs)
          "")))
-    ((or 'autonomous 'continuous)
+    ('autonomous
+     (let ((state (iar--read-memory-file personality-name "STATE.org")))
+       (if (iar--non-blank-p state)
+           (format "\n\n=== STATE [%s] ===\n\n%s\n\n=== END STATE ==="
+                   personality-name state)
+         "")))
+    ('continuous
      (let ((state (iar--read-memory-file personality-name "STATE.org")))
        (if (iar--non-blank-p state)
            (format "\n\n=== STATE [%s] ===\n\n%s\n\n=== END STATE ==="
@@ -185,17 +214,35 @@ a list of label strings that were successfully loaded."
 
 ;;; --- Tool filtering ---
 
-(defun iar--filter-tools (all-tools tool-names)
+(defun iar--filter-tools (all-tools tool-names &optional containers)
   "Filter ALL-TOOLS (list of gptel-tool objects) to only those in TOOL-NAMES.
 TOOL-NAMES is a list of tool name strings. If TOOL-NAMES is nil, returns
-ALL-TOOLS unchanged (backward compat -- no #+TOOLS means all tools)."
-  (if (or (null tool-names) (not tool-names))
-      all-tools
-    (cl-remove-if-not
-     (lambda (tool)
-       (let ((name (gptel-tool-name tool)))
-         (member name tool-names)))
-     (copy-sequence all-tools))))
+ALL-TOOLS unchanged (backward compat -- no #+TOOLS means all tools).
+
+When CONTAINERS is non-nil (a list of container target names from
+#+CONTAINERS), execute_code_remote is always included in the result,
+even if not listed in TOOL-NAMES. This is because #+CONTAINERS implies
+execute_code_remote -- the tool is gated by #+CONTAINERS, not #+TOOLS."
+  (let ((base-tools
+         (if (or (null tool-names) (not tool-names))
+             (copy-sequence all-tools)
+           (cl-remove-if-not
+            (lambda (tool)
+              (let ((name (gptel-tool-name tool)))
+                (member name tool-names)))
+            (copy-sequence all-tools)))))
+    ;; If containers is present, ensure execute_code_remote is in the list
+    (when (and containers (listp containers) containers)
+      (let ((has-remote (cl-some (lambda (tool)
+                                   (string= (gptel-tool-name tool) "execute_code_remote"))
+                                 base-tools)))
+        (unless has-remote
+          (let ((remote-tool (cl-find-if (lambda (tool)
+                                            (string= (gptel-tool-name tool) "execute_code_remote"))
+                                          all-tools)))
+            (when remote-tool
+              (setq base-tools (append base-tools (list remote-tool))))))))
+    base-tools))
 
 ;;; --- Main assembly function ---
 
@@ -212,7 +259,8 @@ Returns a plist with keys:
   :archetype -- the archetype name string
   :personality -- the personality name string
   :project -- the project name string
-  :knowledge-labels -- list of auto-loaded knowledge label strings"
+  :knowledge-labels -- list of auto-loaded knowledge label strings
+  :containers -- list of container target names (or nil)"
   (let* ((archetype-content (iar--read-archetype archetype-name))
          (mode (iar--parse-mode archetype-content))
          (personality-content (iar--read-personality personality-name))
@@ -220,6 +268,7 @@ Returns a plist with keys:
          (project-knowledge (plist-get project :knowledge))
          (project-tools (plist-get project :tools))
          (project-objective (plist-get project :objective))
+         (project-containers (plist-get project :containers))
          (base-context (iar--read-base-context))
          (knowledge-result (iar--auto-load-knowledge project-knowledge))
          (knowledge-block (car knowledge-result))
@@ -228,6 +277,7 @@ Returns a plist with keys:
          (mount-info (if (fboundp 'iar--extra-mounts-prompt-string)
                          (iar--extra-mounts-prompt-string)
                        ""))
+         (containers-block (iar--format-containers project-containers))
          (parts (list)))
     ;; Assemble in order
     (push base-context parts)
@@ -244,16 +294,20 @@ Returns a plist with keys:
       (push memory-block parts))
     (when (iar--non-blank-p mount-info)
       (push (format "\n\n%s" mount-info) parts))
+    (when (iar--non-blank-p containers-block)
+      (push containers-block parts))
     (let ((prompt (mapconcat #'identity (nreverse parts) ""))
           (filtered-tools (iar--filter-tools
                            (default-value 'gptel-tools)
-                           project-tools)))
+                           project-tools
+                           project-containers)))
       (list :prompt prompt
             :tools filtered-tools
             :mode mode
             :archetype archetype-name
             :personality personality-name
             :project project-name
-            :knowledge-labels knowledge-labels))))
+            :knowledge-labels knowledge-labels
+            :containers project-containers))))
 
 (provide 'iar-prompt-assembly)

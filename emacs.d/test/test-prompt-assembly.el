@@ -157,3 +157,65 @@
       (should (listp tools))
       ;; Should not contain delegate tool
       (should-not (cl-some (lambda (t) (equal (gptel-tool-name t) "delegate")) tools)))))
+;;; --- Container injection and tool gating tests ---
+
+(ert-deftest test-assembly-format-containers-empty ()
+  "format-containers returns empty string for nil/empty containers."
+  (should (string= (iar--format-containers nil) ""))
+  (should (string= (iar--format-containers '()) "")))
+
+(ert-deftest test-assembly-format-containers-known ()
+  "format-containers returns formatted block for known container types."
+  (let ((result (iar--format-containers '("pentest"))))
+    (should (stringp result))
+    (should (string-match-p "AVAILABLE CONTAINERS" result))
+    (should (string-match-p "pentest:" result))
+    (should (string-match-p "nmap" result))))
+
+(ert-deftest test-assembly-format-containers-unknown ()
+  "format-containers handles unknown container types gracefully."
+  (let ((result (iar--format-containers '("custom-unknown"))))
+    (should (stringp result))
+    (should (string-match-p "custom-unknown:" result))
+    (should (string-match-p "Unknown container type" result))))
+
+(ert-deftest test-assembly-format-containers-multiple ()
+  "format-containers lists multiple targets."
+  (let ((result (iar--format-containers '("pentest" "concepts"))))
+    (should (string-match-p "pentest:" result))
+    (should (string-match-p "concepts:" result))))
+
+(ert-deftest test-assembly-filter-tools-with-containers ()
+  "filter-tools includes execute_code_remote when containers is non-nil."
+  (let* ((tool-read (gptel-make-tool :name "read_file" :function #'identity :description "test" :args nil))
+         (tool-remote (gptel-make-tool :name "execute_code_remote" :function #'identity :description "test" :args nil))
+         (all-tools (list tool-read tool-remote))
+         ;; Only read_file in #+TOOLS, but containers implies execute_code_remote
+         (filtered (iar--filter-tools all-tools '("read_file") '("pentest"))))
+    (should (= (length filtered) 2))
+    (should (cl-some (lambda (t) (equal (gptel-tool-name t) "execute_code_remote")) filtered))
+    (should (cl-some (lambda (t) (equal (gptel-tool-name t) "read_file")) filtered))))
+
+(ert-deftest test-assembly-filter-tools-without-containers ()
+  "filter-tools does NOT include execute_code_remote when containers is nil."
+  (let* ((tool-read (gptel-make-tool :name "read_file" :function #'identity :description "test" :args nil))
+         (tool-remote (gptel-make-tool :name "execute_code_remote" :function #'identity :description "test" :args nil))
+         (all-tools (list tool-read tool-remote))
+         ;; Only read_file in #+TOOLS, no containers
+         (filtered (iar--filter-tools all-tools '("read_file") nil)))
+    (should (= (length filtered) 1))
+    (should (equal (gptel-tool-name (car filtered)) "read_file"))))
+
+(ert-deftest test-assembly-filter-tools-containers-already-in-tools ()
+  "filter-tools does not duplicate execute_code_remote if already in #+TOOLS."
+  (let* ((tool-read (gptel-make-tool :name "read_file" :function #'identity :description "test" :args nil))
+         (tool-remote (gptel-make-tool :name "execute_code_remote" :function #'identity :description "test" :args nil))
+         (all-tools (list tool-read tool-remote))
+         ;; Both in #+TOOLS, containers also present
+         (filtered (iar--filter-tools all-tools '("read_file" "execute_code_remote") '("pentest"))))
+    (should (= (length filtered) 2))
+    ;; Only one execute_code_remote
+    (should (= (cl-count-if (lambda (t) (equal (gptel-tool-name t) "execute_code_remote")) filtered) 1))))
+
+(provide 'test-prompt-assembly)
+;;; test-prompt-assembly.el ends here
