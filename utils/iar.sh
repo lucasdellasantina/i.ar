@@ -90,6 +90,11 @@ Options (both modes):
                        via HTTPS).
   --memory LIMIT       Podman memory limit (default: 8g). Caps container
                        memory to prevent host OOM kills on long sessions.
+  --no-containers      Disable all sidecar containers (overrides #+CONTAINERS).
+                       Useful for debugging the Emacs container in isolation.
+  --container-image T:I Override container image for target T with image I.
+                       Example: --container-image pentest:my-pentest:latest
+                       Can be specified multiple times for different targets.
   --knowledge LABEL    Documentation directory label to load (default: iar/).
                        Can be specified multiple times to load multiple bases.
   --cycle-prompt NAME  Override cycle prompt file (e.g. matrix_turn).
@@ -169,6 +174,8 @@ SSH_KEY_NAME=""
 GPTEL_FORK_PATH=""
 SELF_MODIFICATION=0
 MEMORY_LIMIT="8g"
+NO_CONTAINERS=0
+CONTAINER_IMAGE_OVERRIDES=()
 MOUNT_ARGS=()
 MOUNT_RO_ARGS=()
 KNOWLEDGE_LABELS=()
@@ -300,6 +307,15 @@ while [[ $# -gt 0 ]]; do
             MEMORY_LIMIT="$2"
             shift 2
             ;;
+        --no-containers)
+            NO_CONTAINERS=1
+            shift
+            ;;
+        --container-image)
+            [[ $# -lt 2 ]] && error "--container-image requires a value (target:image)" && exit 1
+            CONTAINER_IMAGE_OVERRIDES+=("$2")
+            shift 2
+            ;;
         --help|-h)
             usage
             exit 0
@@ -406,6 +422,30 @@ if [[ -f "${PROJECT_FILE}" ]]; then
     done < "${PROJECT_FILE}"
 fi
 
+# Parse #+CONTAINERS from project file
+# Format: space-separated list of target names (e.g., pentest concepts life-org)
+CONTAINER_TARGETS=()
+if [[ -f "${PROJECT_FILE}" && "${NO_CONTAINERS}" -eq 0 ]]; then
+    while IFS= read -r line; do
+        if [[ "${line}" =~ ^#\+CONTAINERS:\ *(.*) ]]; then
+            for target in ${BASH_REMATCH[1]}; do
+                CONTAINER_TARGETS+=("${target}")
+                info "  Container target: ${target}"
+            done
+        fi
+    done < "${PROJECT_FILE}"
+fi
+
+# Apply container image overrides
+declare -A CONTAINER_IMAGE_MAP
+for override in "${CONTAINER_IMAGE_OVERRIDES[@]:-}"; do
+    [[ -z "${override}" ]] && continue
+    target_name="${override%%:*}"
+    image_name="${override##*:}"
+    CONTAINER_IMAGE_MAP["${target_name}"]="${image_name}"
+    info "  Image override: ${target_name} -> ${image_name}"
+done
+
 # Warn about loop-only flags in interactive mode
 if [[ "${MODE}" == "interactive" ]]; then
     [[ -n "${AGENT_NAME}" ]] && warn "--agent is ignored in interactive mode (load agents via C-c a inside Emacs)"
@@ -510,6 +550,144 @@ reset_worktree() {
     cd "${REPO_DIR}"
     git checkout . 2>&1 || true
     git clean -fd emacs.d/ 2>&1 || true
+}
+
+# =============================================================================
+# Multi-container orchestration
+# =============================================================================
+# Starts purpose-specific containers alongside the Emacs container.
+# Each container gets a shared workspace at /workspace.
+# Containers are named iar-<target>-<PID> to avoid collisions.
+# Cleanup happens via trap on exit.
+
+SESSION_ID=$$
+SIDECAR_CONTAINERS=()
+SHARED_WORKSPACE=""
+
+# Network policy per container type
+container_network_opts() {
+    local target="$1"
+    case "${target}" in
+        pentest)
+            # Outbound internet access
+            echo "--network=bridge"
+            ;;
+        concepts|life-org)
+            # No outbound internet
+            echo "--network=none"
+            ;;
+        *)
+            # Default: bridge (outbound allowed)
+            echo "--network=bridge"
+            ;;
+    esac
+}
+
+# Resolve image name for a target
+container_image_name() {
+    local target="$1"
+    # Check for override
+    if [[ -n "${CONTAINER_IMAGE_MAP[${target}]:-}" ]]; then
+        echo "${CONTAINER_IMAGE_MAP[${target}]}"
+    else
+        echo "iar-${target}"
+    fi
+}
+
+# Start a single sidecar container
+start_sidecar() {
+    local target="$1"
+    local image
+    image=$(container_image_name "${target}")
+    local cname="iar-${target}-${SESSION_ID}"
+    local net_opts
+    net_opts=$(container_network_opts "${target}")
+
+    # Check if image exists
+    if ! podman image exists "${image}" 2>/dev/null; then
+        warn "Container image '${image}' not found -- skipping ${target} container"
+        warn "Build it with: podman build -t ${image} -f containers/images/${target}/Containerfile"
+        return 1
+    fi
+
+    # Start the container with shared workspace
+    podman run -d \
+        --name "${cname}" \
+        --read-only \
+        --memory="${MEMORY_LIMIT}" \
+        --security-opt no-new-privileges \
+        --cap-drop=all \
+        ${net_opts} \
+        --tmpfs /tmp:rw,size=256m \
+        --tmpfs /run:rw,size=64m \
+        -v "${SHARED_WORKSPACE}:/workspace:z" \
+        "${image}" 2>&1 || {
+            error "Failed to start ${target} container (${cname})"
+            return 1
+        }
+
+    SIDECAR_CONTAINERS+=("${cname}")
+    info "  Started: ${cname} (image: ${image}, network: ${net_opts})"
+    return 0
+}
+
+# Start all sidecar containers for the session
+start_containers() {
+    if [[ "${NO_CONTAINERS}" -eq 1 ]]; then
+        info "Containers: disabled (--no-containers)"
+        return 0
+    fi
+    if [[ ${#CONTAINER_TARGETS[@]} -eq 0 ]]; then
+        return 0
+    fi
+
+    info "Starting ${#CONTAINER_TARGETS[@]} sidecar container(s)..."
+
+    # Create shared workspace directory
+    SHARED_WORKSPACE=$(mktemp -d "/tmp/iar-workspace-XXXXXX")
+    info "  Shared workspace: ${SHARED_WORKSPACE}"
+
+    # Start each container
+    for target in "${CONTAINER_TARGETS[@]}"; do
+        start_sidecar "${target}"
+    done
+}
+
+# Stop and remove all sidecar containers
+stop_containers() {
+    for cname in "${SIDECAR_CONTAINERS[@]:-}"; do
+        [[ -z "${cname}" ]] && continue
+        info "  Stopping: ${cname}"
+        podman rm -f "${cname}" > /dev/null 2>&1 || true
+    done
+    SIDECAR_CONTAINERS=()
+
+    # Clean up shared workspace
+    if [[ -n "${SHARED_WORKSPACE}" && -d "${SHARED_WORKSPACE}" ]]; then
+        rm -rf "${SHARED_WORKSPACE}" 2>/dev/null || true
+        SHARED_WORKSPACE=""
+    fi
+}
+
+# Build container env vars for build_podman_args
+container_env_vars() {
+    if [[ ${#SIDECAR_CONTAINERS[@]} -eq 0 ]]; then
+        return
+    fi
+
+    for cname in "${SIDECAR_CONTAINERS[@]}"; do
+        # Extract target from container name: iar-<target>-<PID>
+        local target
+        target=$(echo "${cname}" | sed "s/^iar-//; s/-${SESSION_ID}$//")
+        local env_var="IAR_CONTAINER_$(echo "${target}" | tr '[:lower:]' '[:upper:]')"
+        echo "-e ${env_var}=${cname}"
+    done
+
+    # Shared workspace path
+    if [[ -n "${SHARED_WORKSPACE}" ]]; then
+        echo "-e IAR_SHARED_WORKSPACE=/workspace"
+        echo "-v ${SHARED_WORKSPACE}:/workspace:z"
+    fi
 }
 
 # =============================================================================
@@ -665,7 +843,8 @@ build_podman_args() {
         -e "GIT_AUTHOR_EMAIL=${GIT_AUTHOR_EMAIL}" \
         -e "GIT_COMMITTER_NAME=${GIT_AUTHOR_NAME}" \
         -e "GIT_COMMITTER_EMAIL=${GIT_AUTHOR_EMAIL}" \
-        -e "GIT_PAGER=cat"
+        -e "GIT_PAGER=cat" \
+        $(container_env_vars)
 }
 
 # =============================================================================
@@ -684,7 +863,14 @@ run_interactive() {
         info "  Self-modification: disabled"
     fi
     info "  Container: ${CONTAINER_NAME}"
+    if [[ ${#CONTAINER_TARGETS[@]} -gt 0 ]]; then
+        info "  Containers: ${CONTAINER_TARGETS[*]}"
+    fi
     info "=========================================="
+
+    # Start sidecar containers
+    start_containers
+    trap stop_containers EXIT
 
     # shellcheck disable=SC2086
     podman run -it \
@@ -692,6 +878,10 @@ run_interactive() {
         "${IMAGE_NAME}" && \
         info "Session ended" || \
         error "Container failed to start"
+
+    # Cleanup sidecar containers
+    stop_containers
+    trap - EXIT
 }
 
 # =============================================================================
@@ -699,6 +889,9 @@ run_interactive() {
 # =============================================================================
 run_cycle() {
     info "Starting ${AGENT_NAME} cycle ${CYCLE}/${MAX_CYCLES} (timeout: ${TIMEOUT}s)"
+
+    # Start sidecar containers for this cycle
+    start_containers
 
     # shellcheck disable=SC2086
     podman run \
@@ -708,7 +901,12 @@ run_cycle() {
         "${IMAGE_NAME}" \
         -c "preflight.sh && emacs --batch -l /root/.emacs.d/init.el --eval '(iar-run-cycle :agent \"${AGENT_NAME}\" :timeout ${TIMEOUT} :self-modification ${SELF_MODIFICATION:-0} ${KNOWLEDGE_EVAL} ${CYCLE_PROMPT_EVAL})'" 2>&1 | tee -a "${LOG_FILE}"
 
-    return ${PIPESTATUS[0]}
+    local rc=${PIPESTATUS[0]}
+
+    # Cleanup sidecar containers after each cycle
+    stop_containers
+
+    return ${rc}
 }
 # =============================================================================
 # One-shot mode
@@ -728,6 +926,9 @@ run_one_shot() {
         info "  Self-modification: disabled"
     fi
     info "  Container: ${CONTAINER_NAME}"
+    if [[ ${#CONTAINER_TARGETS[@]} -gt 0 ]]; then
+        info "  Containers: ${CONTAINER_TARGETS[*]}"
+    fi
     info "  Log: ${LOG_FILE}"
     info "=========================================="
 
@@ -737,6 +938,10 @@ run_one_shot() {
     fi
 
     cleanup_container
+
+    # Start sidecar containers
+    start_containers
+    trap stop_containers EXIT
 
     info "Starting one-shot execution (timeout: ${TIMEOUT}s)"
 
@@ -750,6 +955,11 @@ run_one_shot() {
         -c "preflight.sh && emacs --batch -l /root/.emacs.d/init.el --eval '(iar-run-one-shot :agent \"${AGENT_NAME}\" :timeout ${TIMEOUT} :self-modification ${SELF_MODIFICATION:-0})'" 2>>"${LOG_FILE}"
 
     local exit_code=$?
+
+    # Cleanup sidecar containers
+    stop_containers
+    trap - EXIT
+
     info "One-shot exited with code ${exit_code}"
     return ${exit_code}
 }
