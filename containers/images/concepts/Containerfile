@@ -1,0 +1,44 @@
+FROM quay.io/fedora/fedora-minimal:42
+
+ENV LANG=C.utf8
+
+# Purpose: Concept exploration and computational simulation.
+# No outbound internet access. Concepts directory mounted at /concepts.
+# Shared workspace at /workspace is the file bridge to Emacs container.
+#
+# Tools:
+#   Maxima    -- symbolic computation, algebra, calculus
+#   ngspice   -- circuit simulation (SPICE)
+#   iverilog  -- Verilog simulation and synthesis
+#   gnuplot   -- plotting and visualization
+#   Ruby      -- scripting, test harness, cross-implementation validation
+#   gcc       -- C compilation for hardware-level implementations
+#   make      -- build automation
+
+RUN microdnf update -y && \
+    microdnf install -y \
+        bash \
+        coreutils \
+        findutils \
+        maxima \
+        ngspice \
+        iverilog \
+        gnuplot \
+        ruby \
+        gcc \
+        make \
+        sed \
+        grep \
+        gawk \
+        tar \
+        gzip \
+        unzip \
+    && microdnf clean all
+
+# Unprivileged user for all operations
+RUN useradd -m -s /bin/bash concepts
+WORKDIR /workspace
+USER concepts
+
+# Default entrypoint: sleep keeps container alive for podman exec
+ENTRYPOINT ["sleep", "infinity"]

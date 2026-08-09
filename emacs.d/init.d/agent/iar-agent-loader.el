@@ -85,7 +85,8 @@ Set buffer-local by `iar-load-agent'. Kept for backward compat.")
     ("iar" . "interactive")
     ("agent-assistant" . "agent-assistant")
     ("implementer" . "implementer")
-    ("reviewer" . "reviewer"))
+    ("reviewer" . "reviewer")
+    ("pentest" . "interactive"))
   "Mapping from personality names to default archetype names.
 Used by the cycle runner to determine the archetype from the --agent flag.")
 
