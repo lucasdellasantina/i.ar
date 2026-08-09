@@ -49,7 +49,8 @@
   (load (expand-file-name "memory.el" configs-dir))
   (load (expand-file-name "file-guard.el" configs-dir))
   (load (expand-file-name "debug.el" configs-dir))
-  (load (expand-file-name "tasks.el" configs-dir)))
+  (load (expand-file-name "tasks.el" configs-dir))
+  (load (expand-file-name "mcp.el" configs-dir)))
 
 ;; Shared utilities (must load before all other init.d modules)
 (load (expand-file-name "iar-utils.el" init-shared-dir))
@@ -90,6 +91,10 @@
 
 ;; GPTEL backend configuration
 (load (expand-file-name "iar-gptel-setup.el" init-core-dir))
+
+;; MCP integration -- wire MCP tools into gptel tool system
+;; Must load after gptel setup (needs gptel-make-tool)
+(load (expand-file-name "iar-mcp-setup.el" init-core-dir))
 
 ;; Tool call layer -- the single integration point with gptel.
 ;; All i.ar modules hook into this, not gptel internals directly.

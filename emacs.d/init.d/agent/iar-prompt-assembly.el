@@ -5,7 +5,7 @@
 ;; Assembles a complete system prompt from three primitives:
 ;; 1. Archetype (behavioral mode) -- from agents.d/archetypes/<name>.org
 ;; 2. Personality (voice/character) -- from agents.d/personalities/<name>.org
-;; 3. Project (knowledge + tools + objective + containers) -- from personalization/projects/<name>.org
+;; 3. Project (knowledge + tools + objective + containers + mcp) -- from personalization/projects/<name>.org
 ;;
 ;; Assembly order (top to bottom of prompt):
 ;; 1. base_context.org (expanded #+INCLUDE)
@@ -16,6 +16,7 @@
 ;; 6. Memory injection (mode-based: LOGS.md or STATE.org)
 ;; 7. Mount info
 ;; 8. Available containers (from project #+CONTAINERS)
+;; 9. MCP servers (from project #+MCP)
 ;;
 ;; Memory injection is determined by the archetype's #+MODE: metadata:
 ;; - interactive -> inject LOGS.md (last N lines)
@@ -62,6 +63,28 @@
   "Alist mapping container target names to brief descriptions.
 Used for prompt injection so the agent knows what each container offers.
 Hardcoded for now -- move to metadata files when there are more than ~10.")
+
+;;; --- MCP server descriptions ---
+
+(defconst iar--mcp-server-descriptions
+  '(("burp" . "Burp Suite MCP server. Web vulnerability scanning, HTTP proxy, repeater, scanner. SSE transport at localhost:9876."))
+  "Alist mapping MCP server names to brief descriptions.
+Used for prompt injection so the agent knows what each server offers.
+Hardcoded for now -- extend as more MCP servers are added.")
+
+(defun iar--format-mcp-servers (servers)
+  "Format SERVERS list into a prompt injection block.
+Returns a string with available MCP servers and descriptions,
+or empty string if SERVERS is nil/empty."
+  (if (or (null servers) (not servers))
+      ""
+    (let ((lines nil))
+      (dolist (name servers)
+        (let ((desc (or (cdr (assoc name iar--mcp-server-descriptions))
+                        "MCP server (unknown type).")))
+          (push (format "%s: %s" name desc) lines)))
+      (format "\n\n=== MCP SERVERS ===\n%s\n=== END MCP SERVERS ==="
+              (mapconcat #'identity (nreverse lines) "\n")))))
 
 (defun iar--format-containers (containers)
   "Format CONTAINERS list into a prompt injection block.
@@ -260,7 +283,8 @@ Returns a plist with keys:
   :personality -- the personality name string
   :project -- the project name string
   :knowledge-labels -- list of auto-loaded knowledge label strings
-  :containers -- list of container target names (or nil)"
+  :containers -- list of container target names (or nil)
+  :mcp -- list of MCP server names (or nil)"
   (let* ((archetype-content (iar--read-archetype archetype-name))
          (mode (iar--parse-mode archetype-content))
          (personality-content (iar--read-personality personality-name))
@@ -269,6 +293,7 @@ Returns a plist with keys:
          (project-tools (plist-get project :tools))
          (project-objective (plist-get project :objective))
          (project-containers (plist-get project :containers))
+         (project-mcp (plist-get project :mcp))
          (base-context (iar--read-base-context))
          (knowledge-result (iar--auto-load-knowledge project-knowledge))
          (knowledge-block (car knowledge-result))
@@ -278,6 +303,7 @@ Returns a plist with keys:
                          (iar--extra-mounts-prompt-string)
                        ""))
          (containers-block (iar--format-containers project-containers))
+         (mcp-block (iar--format-mcp-servers project-mcp))
          (parts (list)))
     ;; Assemble in order
     (push base-context parts)
@@ -296,6 +322,8 @@ Returns a plist with keys:
       (push (format "\n\n%s" mount-info) parts))
     (when (iar--non-blank-p containers-block)
       (push containers-block parts))
+    (when (iar--non-blank-p mcp-block)
+      (push mcp-block parts))
     (let ((prompt (mapconcat #'identity (nreverse parts) ""))
           (filtered-tools (iar--filter-tools
                            (default-value 'gptel-tools)
@@ -308,6 +336,7 @@ Returns a plist with keys:
             :personality personality-name
             :project project-name
             :knowledge-labels knowledge-labels
-            :containers project-containers))))
+            :containers project-containers
+            :mcp project-mcp))))
 
 (provide 'iar-prompt-assembly)

@@ -14,6 +14,7 @@
 ;; - Auto-loading project knowledge
 ;; - Tool gating via #+TOOLS metadata
 ;; - Container injection via #+CONTAINERS metadata
+;; - MCP server activation via #+MCP metadata
 
 (require 'cl-lib)
 (require 'subr-x)
@@ -134,6 +135,11 @@ Returns the assembled plist."
     (setq-local iar--current-mode (plist-get result :mode))
     ;; Container targets from #+CONTAINERS (used by execute_code_remote)
     (setq-local iar--current-containers (plist-get result :containers))
+    ;; MCP servers from #+MCP (used by iar-mcp-setup)
+    (setq-local iar--current-mcp-servers (plist-get result :mcp))
+    ;; Start MCP servers and register their tools
+    (when (fboundp 'iar-mcp-setup-session)
+      (iar-mcp-setup-session (plist-get result :mcp)))
     ;; Backward compat: agent-name = personality name
     (setq-local iar--current-agent-name personality)
     (setq iar--current-agent-name personality)

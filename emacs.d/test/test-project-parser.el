@@ -140,5 +140,26 @@
     (should (equal (plist-get meta :containers) '("pentest" "concepts" "life-org")))
     (should (string= (plist-get meta :objective) "Full project"))))
 
+;;; test-project-parser.el ends here
+;;; --- #+MCP parsing tests ---
+
+(ert-deftest test-project-parser-parse-metadata-mcp ()
+  "Parse #+MCP line correctly."
+  (let ((meta (iar--parse-project-metadata
+               "#+KNOWLEDGE: iar/\n#+TOOLS: read_file\n#+MCP: burp\n#+OBJECTIVE: Test")))
+    (should (equal (plist-get meta :mcp) '("burp")))))
+
+(ert-deftest test-project-parser-parse-metadata-mcp-multiple ()
+  "Parse #+MCP line with multiple servers."
+  (let ((meta (iar--parse-project-metadata
+               "#+MCP: burp custom-server\n#+OBJECTIVE: Test")))
+    (should (equal (plist-get meta :mcp) '("burp" "custom-server")))))
+
+(ert-deftest test-project-parser-parse-metadata-mcp-missing ()
+  "Missing #+MCP returns nil."
+  (let ((meta (iar--parse-project-metadata
+               "#+KNOWLEDGE: iar/\n#+TOOLS: read_file\n#+OBJECTIVE: Test")))
+    (should (null (plist-get meta :mcp)))))
+
 (provide 'test-project-parser)
 ;;; test-project-parser.el ends here
