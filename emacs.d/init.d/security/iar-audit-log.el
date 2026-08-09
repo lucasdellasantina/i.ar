@@ -2,7 +2,7 @@
 
 ;;; Audit Log for Agent File Operations and Command Execution
 ;; Appends timestamped entries to a central audit log for every
-;; write_file, replace_in_file, and execute_code_local call.
+;; write_file and execute_code_local call.
 ;;
 ;; Log location: /root/personalization/audit/audit.log
 ;; Format: [YYYY-MM-DD HH:MM:SS] AGENT | TOOL | detail
@@ -62,10 +62,8 @@ never break the operation it is auditing.
 DETAIL is sanitized to prevent log injection via embedded newlines.
 TOOL is expected to be a hardcoded string literal (e.g. \"write_file\")
 and AGENT comes from `iar--get-agent-name' (shared/utils.el) which
-returns `iar--current-agent-name' (validated by `iar--valid-agent-name-p'
-in task_tools.el) -- neither
-is user-controlled, so neither is sanitized.  If this invariant changes,
-sanitize them too.
+returns `iar--current-agent-name' -- neither is user-controlled, so
+neither is sanitized.  If this invariant changes, sanitize them too.
 
 Before writing, checks if the log exceeds `iar-audit-log-max-size'
 and rotates it if so.  This prevents unbounded growth of the audit log."
@@ -91,9 +89,6 @@ and rotates it if so.  This prevents unbounded growth of the audit log."
   "Audit log entry for write_file to FILEPATH."
   (iar--audit-log "write_file" filepath))
 
-(defun iar--audit-log-replace (filepath)
-  "Audit log entry for replace_in_file on FILEPATH."
-  (iar--audit-log "replace_in_file" filepath))
 
 (defun iar--audit-log-append (filepath)
   "Audit log entry for append_file to FILEPATH."

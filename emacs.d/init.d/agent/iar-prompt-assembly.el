@@ -111,11 +111,8 @@ or empty string if CONTAINERS is nil/empty."
 Signals an error if the file is not found."
   (let* ((arch-dir (iar--archetypes-dir))
          (path (expand-file-name (format "%s.org" name) arch-dir)))
-    (unless (file-exists-p path)
-      (error "Archetype '%s' not found at %s" name path))
-    (with-temp-buffer
-      (insert-file-contents path)
-      (string-trim (buffer-string)))))
+    (or (iar--read-file-string path)
+        (error "Archetype '%s' not found at %s" name path))))
 
 (defun iar--parse-mode (archetype-content)
   "Extract #+MODE: metadata from ARCHETYPE-CONTENT.
@@ -136,11 +133,8 @@ continuous, delegated, one-shot). Returns 'interactive if not found."
 Signals an error if the file is not found."
   (let* ((pers-dir (iar--personalities-dir))
          (path (expand-file-name (format "%s.org" name) pers-dir)))
-    (unless (file-exists-p path)
-      (error "Personality '%s' not found at %s" name path))
-    (with-temp-buffer
-      (insert-file-contents path)
-      (string-trim (buffer-string)))))
+    (or (iar--read-file-string path)
+        (error "Personality '%s' not found at %s" name path))))
 
 ;;; --- Base context reading ---
 
@@ -149,11 +143,7 @@ Signals an error if the file is not found."
 The file is at agents.d/base_context.org. #+INCLUDE directives are
 not expanded -- base_context.org is a leaf file with no includes."
   (let ((path (expand-file-name "agents.d/base_context.org" user-emacs-directory)))
-    (if (file-exists-p path)
-        (with-temp-buffer
-          (insert-file-contents path)
-          (string-trim (buffer-string)))
-      "")))
+    (or (iar--read-file-string path) "")))
 
 ;;; --- Memory injection (mode-based) ---
 

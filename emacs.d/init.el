@@ -25,7 +25,7 @@
 (defconst init-tool-call-dir (expand-file-name "tool-call" init-dir))
 
 ;; Add all module subdirectories to load-path so that cross-module
-;; require calls (e.g., (require 'iar-agent-utils) in iar-delegate-tool.el) can
+;; require calls (e.g., (require 'iar-agent-utils) in iar-delegate.el) can
 ;; resolve files in sibling subdirectories.
 (dolist (subdir (list init-shared-dir init-core-dir init-agent-dir init-tools-dir
                        init-tools-fs-dir init-tools-code-dir init-tools-tasks-dir
@@ -56,7 +56,7 @@
 (load (expand-file-name "iar-utils.el" init-shared-dir))
 
 ;; Shared agent utilities (validation + path resolution, must load before
-;; task_tools, iar-agent-loader, iar-delegate-tool, iar-reload-os, iar-reload-agent, iar-memory-tools)
+;; task_tools, iar-agent-loader, iar-delegate, iar-reload-os, iar-reload-agent, iar-memory-tools)
 (load (expand-file-name "iar-agent-utils.el" init-shared-dir))
 
 ;; Self-modification mode -- controlled by EMACBOROS_SELF_MODIFICATION env var.
@@ -182,7 +182,6 @@
 (load (expand-file-name "iar-knowledge-loader.el" init-agent-dir))
 
 ;; Personality loader -- compatibility shim (merged into agent-loader)
-(load (expand-file-name "iar-personality-loader.el" init-agent-dir))
 
 ;; Buffer info (C-c b, C-c v) -- split from knowledge-loader
 (load (expand-file-name "iar-buffer-info.el" init-agent-dir))

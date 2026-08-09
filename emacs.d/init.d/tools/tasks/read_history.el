@@ -34,9 +34,7 @@ HISTORY.log files live in the audit mount at
             ;; Read single agent's history
             (progn
               (iar--validate-agent-name agent-name)
-              (let* ((project (or (and (boundp 'iar--current-project) iar--current-project)
-                                  (getenv "IAR_PROJECT")
-                                  "iar"))
+              (let* ((project (iar--current-project-name))
                      (log-file (expand-file-name
                                 (format "%s/%s/HISTORY.log" project agent-name)
                                 audit-base)))

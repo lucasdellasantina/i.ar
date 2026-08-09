@@ -129,14 +129,6 @@ Temporarily rebinds `iar--audit-log-path' to a temp file."
       (should (string-match-p "write_file" content))
       (should (string-match-p "/some/file.el" content)))))
 
-(ert-deftest test-audit-log-replace-logs-path ()
-  "iar--audit-log-replace should log the filepath with replace_in_file tool name."
-  (with-audit-fixture
-    (iar--audit-log-replace "/some/other.el")
-    (let ((content (test-audit--read-log)))
-      (should (string-match-p "replace_in_file" content))
-      (should (string-match-p "/some/other.el" content)))))
-
 (ert-deftest test-audit-log-append-logs-path ()
   "iar--audit-log-append should log the filepath with append_file tool name."
   (with-audit-fixture

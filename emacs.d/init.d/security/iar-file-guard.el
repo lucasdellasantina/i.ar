@@ -1,8 +1,8 @@
 ;; -*- lexical-binding: t; -*-
 
 ;;; File Guard -- Protected Path Enforcement
-;; Prevents agents from modifying critical system files via write_file,
-;; replace_in_file, and append_file tools.
+;; Prevents agents from modifying critical system files via write_file
+;; and append_file tools.
 ;;
 ;; Protected categories (always active):
 ;; 1. Agent prompt files (prompt.org) -- prevents self-modification
@@ -115,14 +115,6 @@ paths are checked against each pattern.  When they are the same
                            (and has-symlink (funcall pred truename)))
                    reason)))
              (iar--guard--active-patterns))))
-
-(defun iar--guard-check-replace (filepath)
-  "Check if FILEPATH is protected against replace_in_file operations.
-Delegates to `iar--guard-check-write' -- replace has the same
-protections as write.  HISTORY.log is blocked for replace (only
-append is allowed) because it is in the always-protected list,
-which `iar--guard-check-write' checks."
-  (iar--guard-check-write filepath))
 
 (defun iar--guard-check-append (filepath)
   "Check if FILEPATH is protected against append_file operations.

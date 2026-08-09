@@ -49,7 +49,7 @@
 ;; --- Module subdirectories (must match init.el ordering) ---
 ;; Listed in dependency order: core, security, tools, agent, debug, session, dynamic.
 ;; This mirrors the explicit load order in init.el so that inter-module
-;; dependencies (e.g., iar-prompt-loader before iar-delegate-tool, iar-output-sanitizer
+;; dependencies (e.g., iar-prompt-loader before iar-delegate, iar-output-sanitizer
 ;; before code_tools, iar-file-guard before iar-audit-log) are satisfied.
 
 (defconst test-init-dir (expand-file-name "init.d" user-emacs-directory))
@@ -118,7 +118,7 @@
 
 ;; --- Load prompt loader (must be before modules that use prompts) ---
 ;; iar-prompt-loader.el lives in init.d/agent/ and must load before
-;; iar-delegate-tool, iar-memory-tools, and iar-loop-guard which call
+;; iar-delegate, iar-memory-tools, and iar-loop-guard which call
 ;; iar--load-prompt at load time (in defconst forms).
 
 (load (expand-file-name "iar-prompt-loader.el"

@@ -86,7 +86,9 @@ Set buffer-local by `iar-load-agent'. Kept for backward compat.")
     ("agent-assistant" . "agent-assistant")
     ("implementer" . "implementer")
     ("reviewer" . "reviewer")
-    ("pentest" . "interactive"))
+    ("pentest" . "interactive")
+    ("test" . "one-shot")
+    ("test-continuous" . "autonomous"))
   "Mapping from personality names to default archetype names.
 Used by the cycle runner to determine the archetype from the --agent flag.")
 
@@ -185,7 +187,7 @@ Re-assembles the prompt with the current archetype and project.
 Returns t if loaded, nil if personality not found."
   (let* ((names (iar--personality-names))
          (archetype (or iar--current-archetype "interactive"))
-         (project (or iar--current-project "iar")))
+         (project (iar--current-project-name)))
     (if (not (member name names))
         (progn
           (message "[personality] '%s' not found" name)
@@ -213,8 +215,7 @@ This is C-c p -- switch personality mid-session."
 (defun iar-personality-info ()
   "Return a string describing the currently loaded personality.
 Used by iar-prompt-info to display personality in the prompt breakdown."
-  (or iar--current-personality
-      iar--current-agent-name
+  (or (iar--current-personality-name)
       "none"))
 
 (with-eval-after-load 'gptel

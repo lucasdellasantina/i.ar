@@ -4,7 +4,7 @@
 ;; Tests the protected path enforcement system.
 ;;
 ;; The file guard prevents agents from modifying critical system files
-;; via write_file, replace_in_file, and append_file tools.
+;; via write_file, write_file, and append_file tools.
 ;;
 ;; Test coverage:
 ;; - Always-protected paths (archetypes, personalities, cycles, base_context,
@@ -50,9 +50,9 @@
                       "/root/.emacs.d/agents.d/personalities/mccarthy.org")))))
 
 (ert-deftest test-fg-replace-blocks-agent-prompt ()
-  "replace_in_file should be blocked for any personality .org file."
+  "write_file should be blocked for any personality .org file."
   (with-fg-fixture
-    (should (stringp (iar--guard-check-replace
+    (should (stringp (iar--guard-check-write
                       "/root/.emacs.d/agents.d/personalities/darwin.org")))))
 
 (ert-deftest test-fg-append-blocks-agent-prompt ()
@@ -66,7 +66,7 @@
   (with-fg-self-mod
     (should (stringp (iar--guard-check-write
                       "/root/.emacs.d/agents.d/personalities/darwin.org")))
-    (should (stringp (iar--guard-check-replace
+    (should (stringp (iar--guard-check-write
                       "/root/.emacs.d/agents.d/personalities/darwin.org")))
     (should (stringp (iar--guard-check-append
                       "/root/.emacs.d/agents.d/personalities/darwin.org")))))
@@ -104,9 +104,9 @@
                       "/root/.emacs.d/agents.d/base_context.org")))))
 
 (ert-deftest test-fg-replace-blocks-base-context ()
-  "replace_in_file should be blocked for base_context.org."
+  "write_file should be blocked for base_context.org."
   (with-fg-fixture
-    (should (stringp (iar--guard-check-replace
+    (should (stringp (iar--guard-check-write
                       "/root/.emacs.d/agents.d/base_context.org")))))
 
 (ert-deftest test-fg-append-blocks-base-context ()
@@ -120,7 +120,7 @@
   (with-fg-self-mod
     (should (stringp (iar--guard-check-write
                       "/root/.emacs.d/agents.d/base_context.org")))
-    (should (stringp (iar--guard-check-replace
+    (should (stringp (iar--guard-check-write
                       "/root/.emacs.d/agents.d/base_context.org")))
     (should (stringp (iar--guard-check-append
                       "/root/.emacs.d/agents.d/base_context.org")))))
@@ -136,9 +136,9 @@
                       "/root/personalization/audit/iar/reviewer/HISTORY.log")))))
 
 (ert-deftest test-fg-replace-blocks-history-log ()
-  "replace_in_file should be blocked for HISTORY.log files."
+  "write_file should be blocked for HISTORY.log files."
   (with-fg-fixture
-    (should (stringp (iar--guard-check-replace
+    (should (stringp (iar--guard-check-write
                       "/root/personalization/audit/iar/darwin/HISTORY.log")))))
 
 (ert-deftest test-fg-append-allows-history-log ()
@@ -170,9 +170,9 @@
                       "/root/personalization/audit/iar/darwin/HISTORY.log")))))
 
 (ert-deftest test-fg-replace-blocks-history-log-with-self-mod ()
-  "replace_in_file should still block HISTORY.log with self-modification on."
+  "write_file should still block HISTORY.log with self-modification on."
   (with-fg-self-mod
-    (should (stringp (iar--guard-check-replace
+    (should (stringp (iar--guard-check-write
                       "/root/personalization/audit/iar/darwin/HISTORY.log")))))
 
 ;;; --- Conditionally-protected paths: init.el ---
@@ -184,9 +184,9 @@
                       "/root/.emacs.d/init.el")))))
 
 (ert-deftest test-fg-replace-blocks-init-el ()
-  "replace_in_file should be blocked for init.el when self-modification is off."
+  "write_file should be blocked for init.el when self-modification is off."
   (with-fg-fixture
-    (should (stringp (iar--guard-check-replace
+    (should (stringp (iar--guard-check-write
                       "/root/.emacs.d/init.el")))))
 
 (ert-deftest test-fg-append-blocks-init-el ()
@@ -202,9 +202,9 @@
                  "/root/.emacs.d/init.el"))))
 
 (ert-deftest test-fg-replace-allows-init-el-with-self-mod ()
-  "replace_in_file should be allowed for init.el when self-modification is on."
+  "write_file should be allowed for init.el when self-modification is on."
   (with-fg-self-mod
-    (should-not (iar--guard-check-replace
+    (should-not (iar--guard-check-write
                  "/root/.emacs.d/init.el"))))
 
 ;;; --- Conditionally-protected paths: init.d/*.el ---
@@ -220,9 +220,9 @@
                       "/root/.emacs.d/init.d/tools/filesystem/read_file.el")))))
 
 (ert-deftest test-fg-replace-blocks-init-d-el ()
-  "replace_in_file should be blocked for init.d/*.el when self-modification is off."
+  "write_file should be blocked for init.d/*.el when self-modification is off."
   (with-fg-fixture
-    (should (stringp (iar--guard-check-replace
+    (should (stringp (iar--guard-check-write
                       "/root/.emacs.d/init.d/security/file_guard.el")))))
 
 (ert-deftest test-fg-write-allows-init-d-el-with-self-mod ()
@@ -234,9 +234,9 @@
                  "/root/.emacs.d/init.d/agent/agent_loader.el"))))
 
 (ert-deftest test-fg-replace-allows-init-d-el-with-self-mod ()
-  "replace_in_file should be allowed for init.d/*.el when self-modification is on."
+  "write_file should be allowed for init.d/*.el when self-modification is on."
   (with-fg-self-mod
-    (should-not (iar--guard-check-replace
+    (should-not (iar--guard-check-write
                  "/root/.emacs.d/init.d/security/file_guard.el"))))
 
 (ert-deftest test-fg-append-blocks-init-d-el ()
@@ -260,9 +260,9 @@
                       "/root/i.ar/Containerfile")))))
 
 (ert-deftest test-fg-replace-blocks-containerfile ()
-  "replace_in_file should be blocked for Containerfile when self-modification is off."
+  "write_file should be blocked for Containerfile when self-modification is off."
   (with-fg-fixture
-    (should (stringp (iar--guard-check-replace
+    (should (stringp (iar--guard-check-write
                       "/root/i.ar/Containerfile")))))
 
 (ert-deftest test-fg-append-blocks-containerfile ()
@@ -286,9 +286,9 @@
                       "/root/i.ar/emacboros.sh")))))
 
 (ert-deftest test-fg-replace-blocks-emacboros-sh ()
-  "replace_in_file should be blocked for emacboros.sh when self-modification is off."
+  "write_file should be blocked for emacboros.sh when self-modification is off."
   (with-fg-fixture
-    (should (stringp (iar--guard-check-replace
+    (should (stringp (iar--guard-check-write
                       "/root/i.ar/emacboros.sh")))))
 
 (ert-deftest test-fg-append-blocks-emacboros-sh ()
@@ -314,9 +314,9 @@
                       "/opt/containers/Dockerfile")))))
 
 (ert-deftest test-fg-replace-blocks-containers-dir ()
-  "replace_in_file should be blocked for paths under containers/ when self-modification is off."
+  "write_file should be blocked for paths under containers/ when self-modification is off."
   (with-fg-fixture
-    (should (stringp (iar--guard-check-replace
+    (should (stringp (iar--guard-check-write
                       "/root/i.ar/containers/app/config.yml")))))
 
 (ert-deftest test-fg-append-blocks-containers-dir ()
@@ -342,9 +342,9 @@
                       "/root/i.ar/.git/hooks/post-receive")))))
 
 (ert-deftest test-fg-replace-blocks-git-hooks ()
-  "replace_in_file should be blocked for git hooks when self-modification is off."
+  "write_file should be blocked for git hooks when self-modification is off."
   (with-fg-fixture
-    (should (stringp (iar--guard-check-replace
+    (should (stringp (iar--guard-check-write
                       "/root/i.ar/.git/hooks/pre-commit")))))
 
 (ert-deftest test-fg-append-blocks-git-hooks ()
@@ -368,9 +368,9 @@
     (should-not (iar--guard-check-write "/root/some-project/src/main.py"))))
 
 (ert-deftest test-fg-replace-allows-arbitrary-file ()
-  "replace_in_file should be allowed for arbitrary non-protected files."
+  "write_file should be allowed for arbitrary non-protected files."
   (with-fg-fixture
-    (should-not (iar--guard-check-replace "/tmp/some-file.txt"))))
+    (should-not (iar--guard-check-write "/tmp/some-file.txt"))))
 
 (ert-deftest test-fg-append-allows-arbitrary-file ()
   "append_file should be allowed for arbitrary non-protected files."
@@ -381,7 +381,7 @@
   "Non-protected files should be allowed even with self-modification on."
   (with-fg-self-mod
     (should-not (iar--guard-check-write "/tmp/some-file.txt"))
-    (should-not (iar--guard-check-replace "/tmp/some-file.txt"))
+    (should-not (iar--guard-check-write "/tmp/some-file.txt"))
     (should-not (iar--guard-check-append "/tmp/some-file.txt"))))
 
 ;;; --- Edge cases ---
@@ -422,9 +422,9 @@ TODO.md and IDEAS.md are freely writable."
                       "/root/personalization/audit/iar/darwin/LOGS.md")))))
 
 (ert-deftest test-fg-replace-blocks-logs-md ()
-  "replace_in_file should be blocked for LOGS.md files (append-only)."
+  "write_file should be blocked for LOGS.md files (append-only)."
   (with-fg-fixture
-    (should (stringp (iar--guard-check-replace
+    (should (stringp (iar--guard-check-write
                       "/root/personalization/audit/iar/darwin/LOGS.md")))))
 
 (ert-deftest test-fg-write-blocks-history-log-anywhere ()
@@ -486,13 +486,13 @@ Conditional: init.el, init.d/*.el, Containerfile, emacboros.sh, containers/, .gi
         (delete-file link)))))
 
 (ert-deftest test-fg-replace-blocks-symlink-to-protected-file ()
-  "replace_in_file should be blocked when path is a symlink to a protected file."
+  "write_file should be blocked when path is a symlink to a protected file."
   (with-fg-fixture
     (let ((link (expand-file-name "test-fg-symlink-replace.el" temporary-file-directory)))
       (when (file-exists-p link) (delete-file link))
       (make-symbolic-link "/root/.emacs.d/init.d/security/file_guard.el" link)
       (unwind-protect
-          (should (stringp (iar--guard-check-replace link)))
+          (should (stringp (iar--guard-check-write link)))
         (delete-file link)))))
 
 ;;; --- HISTORY.log in protected directories ---

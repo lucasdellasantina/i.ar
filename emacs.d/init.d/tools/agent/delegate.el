@@ -352,4 +352,4 @@ so the user can watch progress in real time."
   :async t
   :function #'iar--tool-delegate))
 
-(provide 'iar-delegate-tool)
+(provide 'iar-delegate)

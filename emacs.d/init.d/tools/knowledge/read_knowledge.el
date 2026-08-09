@@ -23,6 +23,7 @@
 (require 'cl-lib)
 (require 'subr-x)
 (require 'iar-agent-utils)
+(require 'iar-utils)  ; iar--read-file-string, iar--read-description-org, iar--dirs-with-description
 
 ;; Declared in configs/ (loaded before init.d modules).
 ;; Forward-declared: owned by configs/paths.el.
@@ -37,43 +38,16 @@
   "Return the absolute path to the knowledge base directory."
   (expand-file-name iar-knowledge-base-path iar-personalization-path))
 
-(defun iar--knowledge-base-entries ()
-  "Return a list of subdirectory paths in the knowledge base dir.
-Only subdirectories containing a description.org are included.
-Sorted alphabetically."
-  (let ((kdir (iar--knowledge-base-dir))
-        entries)
-    (when (file-directory-p kdir)
-      (dolist (entry (directory-files kdir t "^[^.]" t))
-        (when (and (file-directory-p entry)
-                   (file-exists-p (expand-file-name "description.org" entry)))
-          (push entry entries))))
-    (nreverse (sort entries #'string<))))
-
-(defun iar--knowledge-read-description (dir)
-  "Read the description.org file in DIR. Return nil if not found."
-  (let ((desc-file (expand-file-name "description.org" dir)))
-    (when (file-exists-p desc-file)
-      (with-temp-buffer
-        (insert-file-contents desc-file)
-        (string-trim (buffer-string))))))
-
 (defun iar--knowledge-format-tree (dir depth)
   "Format a tree-like hierarchy of knowledge bases under DIR at DEPTH.
 Returns a string with indented KB names and descriptions.
 Only subdirectories containing description.org are listed."
-  (let ((entries nil)
+  (let ((entries (iar--dirs-with-description dir))
         (indent (make-string (* depth 2) ? ))
         (parts nil))
-    (when (file-directory-p dir)
-      (dolist (entry (directory-files dir t "^[^.]" t))
-        (when (and (file-directory-p entry)
-                   (file-exists-p (expand-file-name "description.org" entry)))
-          (push entry entries))))
-    (setq entries (nreverse (sort entries #'string<)))
     (dolist (entry entries)
       (let* ((name (file-name-nondirectory entry))
-             (desc (iar--knowledge-read-description entry))
+             (desc (iar--read-description-org entry))
              (header (if desc
                          (format "%s%s\n%s  %s" indent name indent desc)
                        (format "%s%s" indent name))))
@@ -91,7 +65,7 @@ description appended."
       (cond
        ((file-directory-p entry)
         (let* ((name (file-name-nondirectory entry))
-               (desc (iar--knowledge-read-description entry)))
+               (desc (iar--read-description-org entry)))
           (push (if desc
                     (format "  %s/ -- %s" name desc)
                   (format "  %s/" name))
@@ -122,27 +96,22 @@ Returns a string with file headers and contents, or nil if no files found."
       (when (and (file-regular-p file)
                  (not (string= (file-name-nondirectory file) "description.org")))
         (let* ((fname (file-name-nondirectory file))
-               (content (with-temp-buffer
-                          (insert-file-contents file)
-                          (string-trim (buffer-string)))))
+               (content (iar--read-file-string file)))
           (push (format "=== %s ===\n%s" fname content) parts))))
     (when parts
       (mapconcat #'identity (nreverse parts) "\n\n"))))
 
 (defun iar--knowledge-valid-path-segment-p (seg)
   "Return non-nil if SEG is a valid path segment for knowledge base paths.
-Unlike `iar--valid-name-p', this allows dots (for file extensions like
-.rb, .c, .tex, .spice). Still blocks path traversal characters
-(slashes, backslashes, null bytes) and empty segments."
+Allows letters, digits, dots (for file extensions), hyphens, and underscores."
   (and (stringp seg)
-       (not (string-empty-p seg))
        (string-match-p "\\`[a-zA-Z0-9._-]+\\'" seg)))
 
 (defun iar--knowledge-resolve-path (path)
-  "Resolve a slash-separated PATH within the knowledge base directory.
-Returns the absolute path, or signals an error on invalid input or
-path traversal. Does NOT append a file extension -- files have real
-extensions.  Allows dots in path segments for file extensions."
+  "Resolve PATH to a full path within the knowledge base dir.
+Validates each segment and checks for path traversal.
+Does NOT append a file extension -- files have real extensions.
+Allows dots in path segments for file extensions."
   (when (or (null path) (not (stringp path)) (string-empty-p (string-trim path)))
     (error "Invalid knowledge path: empty or nil"))
   (let ((segments (split-string path "/" t)))
@@ -155,6 +124,12 @@ extensions.  Allows dots in path segments for file extensions."
            (full-path (expand-file-name path base-dir)))
       (iar--path-traversal-check full-path base-dir)
       full-path)))
+
+(defun iar--knowledge-has-subdirs-p (dir)
+  "Return non-nil if DIR contains at least one subdirectory."
+  (cl-some #'file-directory-p
+           (mapcar (lambda (e) (expand-file-name e dir))
+                   (directory-files dir t "^[^.]" t))))
 
 (defun iar--tool-read-knowledge (&optional path)
   "Read from the concept knowledge base directory.
@@ -181,11 +156,8 @@ With a PATH, return detail at that level."
             (cond
              ;; Directory with subdirectories: description + names of children
              ((and (file-directory-p full-path)
-                   (cl-some #'file-directory-p
-                            (mapcar (lambda (e)
-                                      (expand-file-name e full-path))
-                                    (directory-files full-path t "^[^.]" t))))
-              (let ((desc (iar--knowledge-read-description full-path))
+                   (iar--knowledge-has-subdirs-p full-path))
+              (let ((desc (iar--read-description-org full-path))
                     (listing (iar--knowledge-list-contents full-path)))
                 (concat
                  (when desc (format "=== description ===\n%s" desc))
@@ -193,11 +165,8 @@ With a PATH, return detail at that level."
                  (format "=== contents ===\n%s" listing))))
              ;; Directory without subdirectories: read all file contents
              ((and (file-directory-p full-path)
-                   (not (cl-some #'file-directory-p
-                                 (mapcar (lambda (e)
-                                           (expand-file-name e full-path))
-                                         (directory-files full-path t "^[^.]" t)))))
-              (let ((desc (iar--knowledge-read-description full-path))
+                   (not (iar--knowledge-has-subdirs-p full-path)))
+              (let ((desc (iar--read-description-org full-path))
                     (file-contents (iar--knowledge-read-all-files full-path)))
                 (concat
                  (when desc (format "=== description ===\n%s" desc))
@@ -206,9 +175,7 @@ With a PATH, return detail at that level."
                      (format "No files found in %s" path-trim)))))
              ;; File: return single file content
              ((and (file-exists-p full-path) (file-regular-p full-path))
-              (with-temp-buffer
-                (insert-file-contents full-path)
-                (string-trim (buffer-string))))
+              (iar--read-file-string full-path))
              ;; Neither found
              (t
               (format "Knowledge base entry not found: %s" path-trim)))))))

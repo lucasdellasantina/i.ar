@@ -31,17 +31,6 @@
   :type 'string
   :group 'iar)
 
-(defcustom iar-personality-open-delimiter "=== PERSONALITY [%s] ==="
-  "Format string for the opening delimiter of injected personality.
-%s is replaced with the personality name (e.g., \"mirror\")."
-  :type 'string
-  :group 'iar)
-
-(defcustom iar-personality-close-delimiter "=== END PERSONALITY ==="
-  "Closing delimiter for injected personality blocks."
-  :type 'string
-  :group 'iar)
-
 (defcustom iar-sanitized-open "[SANITIZED EXTERNAL DATA -- control sequences stripped, injection patterns flagged]"
   "Prefix wrapper for sanitized external data."
   :type 'string
@@ -49,16 +38,6 @@
 
 (defcustom iar-sanitized-close "[END SANITIZED EXTERNAL DATA]"
   "Suffix wrapper for sanitized external data."
-  :type 'string
-  :group 'iar)
-
-(defcustom iar-injection-suspect-prefix "[INJECTION SUSPECT]"
-  "Prefix added to lines that resemble prompt injection attempts."
-  :type 'string
-  :group 'iar)
-
-(defcustom iar-removed-tag "[REMOVED-TAG]"
-  "Replacement text for neutralized fake system message wrapper tags."
   :type 'string
   :group 'iar)
 
@@ -70,7 +49,6 @@ Coupled with agents.d/common/delegated_task.org prompt template."
   :type 'string
   :group 'iar)
 
-(provide 'iar-config-delimiters)
 (defcustom iar-one-shot-response-open "=== BEGIN FINAL RESPONSE ==="
   "Opening delimiter for one-shot agent final response.
 The one-shot completion handler searches for this marker to detect
@@ -85,3 +63,5 @@ Coupled with agents.d/archetypes/one-shot.org prompt."
 See `iar-one-shot-response-open' for details."
   :type 'string
   :group 'iar)
+
+(provide 'iar-config-delimiters)

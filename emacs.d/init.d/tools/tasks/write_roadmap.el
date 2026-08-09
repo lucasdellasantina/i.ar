@@ -21,7 +21,7 @@
   "Write CONTENT to ROADMAP.org in the current agent's tasks directory.
 Overwrites any existing roadmap. File-guard protected."
   (condition-case err
-      (let* ((agent-dir (iar--resolve-agent-tasks-dir))
+      (let* ((agent-dir (iar--resolve-project-tasks-dir))
              (roadmap-path (expand-file-name "ROADMAP.org" agent-dir)))
         ;; File guard check -- write_file enforces this, but we check
         ;; here too for a clear error message before attempting the write.

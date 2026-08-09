@@ -17,16 +17,7 @@
 (require 'cl-lib)
 (require 'subr-x)
 (require 'iar-agent-utils)
-
-(defun iar--task-tree-entries (dir)
-  "Return a list of subdirectory paths in DIR that contain a description.org.
-Sorted alphabetically."
-  (let (entries)
-    (dolist (entry (directory-files dir t "^[^.]" t))
-      (when (and (file-directory-p entry)
-                 (file-exists-p (expand-file-name "description.org" entry)))
-        (push entry entries)))
-    (nreverse (sort entries #'string<))))
+(require 'iar-utils)  ; iar--read-file-string, iar--read-description-org, iar--dirs-with-description
 
 (defun iar--task-subtask-files (dir)
   "Return a list of .org files in DIR that are not description.org.
@@ -38,23 +29,15 @@ Sorted alphabetically."
           (push entry files))))
     (nreverse (sort files #'string<))))
 
-(defun iar--task-read-description (dir)
-  "Read the description.org file in DIR. Return nil if not found."
-  (let ((desc-file (expand-file-name "description.org" dir)))
-    (when (file-exists-p desc-file)
-      (with-temp-buffer
-        (insert-file-contents desc-file)
-        (string-trim (buffer-string))))))
-
 (defun iar--task-format-tree (dir depth)
   "Format a tree-like hierarchy of tasks under DIR at indentation DEPTH.
 Returns a string with indented task names and full descriptions."
-  (let ((entries (iar--task-tree-entries dir))
+  (let ((entries (iar--dirs-with-description dir))
         (indent (make-string (* depth 2) ? ))
         (parts nil))
     (dolist (entry entries)
       (let* ((name (file-name-nondirectory entry))
-             (desc (iar--task-read-description entry))
+             (desc (iar--read-description-org entry))
              (header (if desc
                         (format "%s%s\n%s  %s" indent name indent desc)
                       (format "%s%s" indent name))))
@@ -70,7 +53,7 @@ Returns a string with indented task names and full descriptions."
 With nil PATH, return a tree-like hierarchy of all tasks.
 With a PATH, return detail for that specific task or file."
   (condition-case err
-      (let ((agent-dir (iar--resolve-agent-tasks-dir)))
+      (let ((agent-dir (iar--resolve-project-tasks-dir)))
         (cond
          ;; nil path: return full tree
          ((or (null path)
@@ -98,8 +81,8 @@ With a PATH, return detail for that specific task or file."
              ;; Directory with subdirectories: description + tree of children
              ((and dir-path
                    (file-directory-p dir-path)
-                   (iar--task-tree-entries dir-path))
-              (let ((desc (iar--task-read-description dir-path))
+                   (iar--dirs-with-description dir-path))
+              (let ((desc (iar--read-description-org dir-path))
                     (tree (iar--task-format-tree dir-path 1)))
                 (concat
                  (when desc (format "=== description ===\n%s" desc))
@@ -108,8 +91,8 @@ With a PATH, return detail for that specific task or file."
              ;; Directory without subdirectories: description + all subtask files
              ((and dir-path
                    (file-directory-p dir-path)
-                   (not (iar--task-tree-entries dir-path)))
-              (let ((desc (iar--task-read-description dir-path))
+                   (not (iar--dirs-with-description dir-path)))
+              (let ((desc (iar--read-description-org dir-path))
                     (subtask-files (iar--task-subtask-files dir-path))
                     (parts nil))
                 (when desc
@@ -119,18 +102,14 @@ With a PATH, return detail for that specific task or file."
                     ;; Strip .org extension
                     (setq basename (substring basename 0 (- (length basename) 4)))
                     (push (format "=== %s ===\n%s" basename
-                                  (with-temp-buffer
-                                    (insert-file-contents sf)
-                                    (string-trim (buffer-string))))
+                                  (iar--read-file-string sf))
                           parts)))
                 (if parts
                     (mapconcat #'identity (nreverse parts) "\n\n")
                   (format "Task directory exists but has no description or subtasks: %s" path-trim))))
              ;; File: return single file content
              ((and file-path (file-exists-p file-path))
-              (with-temp-buffer
-                (insert-file-contents file-path)
-                (string-trim (buffer-string))))
+              (iar--read-file-string file-path))
              ;; Neither found
              (t
               (format "Task not found: %s" path-trim)))))))

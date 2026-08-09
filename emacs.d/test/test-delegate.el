@@ -1,6 +1,6 @@
 ;; -*- lexical-binding: t; -*-
 
-;;; Tests for iar-delegate-tool.el
+;;; Tests for iar-delegate.el
 ;; Tests depth tracking, path traversal protection, validation,
 ;; timeout edge cases, timeout handler, completion hook,
 ;; and depth limit enforcement. Full delegation tests that spawn gptel
@@ -9,7 +9,7 @@
 (require 'ert)
 (require 'cl-lib)
 (require 'subr-x)
-(require 'iar-delegate-tool)
+(require 'iar-delegate)
 (require 'iar-prompt-assembly)
 
 ;;; --- Validation tests ---

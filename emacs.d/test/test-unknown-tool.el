@@ -90,7 +90,7 @@ result via `gptel--process-tool-call'.  This sets :result on the
 tool-call plist, preventing the FSM from hanging in TOOL state.
 
 This test calls the actual `iar--block-unknown-tools' function
-(defined in iar-delegate-tool.el) with a let-bound `gptel-tools' so the
+(defined in iar-delegate.el) with a let-bound `gptel-tools' so the
 function reads the test tool list, not the global one."
   (require 'iar-tool-guard)
   (let* ((tool-spec (gptel-make-tool

@@ -23,11 +23,6 @@ Contains docs/, knowledge/, tasks/, audit/ subdirectories."
   :type 'string
   :group 'iar)
 
-(defcustom iar-agents-path "agents.d/agents"
-  "Relative path to legacy agent profile directories.
-DEPRECATED: Being replaced by the three-axis assembly model."
-  :type 'string
-  :group 'iar)
 
 (defcustom iar-archetypes-path "agents.d/archetypes"
   "Relative path to archetype definition files."

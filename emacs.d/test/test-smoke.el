@@ -19,11 +19,15 @@
 (defun test-smoke--provide-symbol (filepath)
   "Extract the provide symbol from FILEPATH.
 Reads the file and finds the (provide 'sym) form.
-Returns the symbol, or nil if not found."
+Returns the symbol, or nil if not found.
+
+The regex is anchored to beginning of line to avoid matching
+string literals that contain provide-like patterns (e.g., the
+guidelines checker's own regex patterns)."
   (with-temp-buffer
     (insert-file-contents filepath)
     (goto-char (point-min))
-    (when (re-search-forward "(provide '\\([^)]+\\))" nil t)
+    (when (re-search-forward "^[ \t]*(provide '\\([^)]+\\))" nil t)
       (intern (match-string 1)))))
 
 (ert-deftest smoke-all-init-modules-loaded ()

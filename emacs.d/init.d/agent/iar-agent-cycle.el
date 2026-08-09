@@ -19,10 +19,9 @@
 (require 'gptel)
 (require 'cl-lib)
 (require 'subr-x)
+(require 'iar-utils)  ; iar--read-file-string, iar--current-project-name
 (require 'iar-prompt-loader)
-(require 'iar-knowledge-loader)
 (require 'iar-tool-guard)
-(require 'iar-mount-awareness)
 (require 'iar-tool-call)
 (require 'iar-agent-loader)  ; iar--archetype-for-personality, iar--project-for-personality, iar--setup-assembled-buffer
 (require 'iar-prompt-assembly)  ; iar--assemble-prompt
@@ -38,7 +37,8 @@
 (defconst iar-personality-cycle-map
   '(("darwin" . "self_modification")
     ("gardener" . "monitoring")
-    ("librarian" . "documentation_sync"))
+    ("librarian" . "documentation_sync")
+    ("test-continuous" . "test_continuous"))
   "Mapping from personality names to default cycle files.
 Used when :cycle is not explicitly provided to iar-run-cycle.")
 
@@ -74,9 +74,7 @@ Returns empty string if usage tracking is not available."
 START and END are buffer positions delimiting the new response text.
 Creates the log file if it does not exist.  Prepends a timestamp."
   (when (and (integerp start) (integerp end) (< start end))
-    (let* ((project (or (and (boundp 'iar--current-project) iar--current-project)
-                          (getenv "IAR_PROJECT")
-                          "iar"))
+    (let* ((project (iar--current-project-name))
            (log-path (expand-file-name
                       (format "%s/%s/cycle.log" project agent-name)
                       (expand-file-name iar-audit-path iar-personalization-path)))
@@ -103,11 +101,8 @@ CYCLE-NAME is the cycle file name without extension (e.g., "self_modification").
 Signals an error if the cycle file is not found."
   (let* ((cycles-dir (expand-file-name iar-cycles-path user-emacs-directory))
          (cycle-path (expand-file-name (format "%s.org" cycle-name) cycles-dir)))
-    (unless (file-exists-p cycle-path)
-      (error "Cycle \'%s\' not found at %s" cycle-name cycle-path))
-    (with-temp-buffer
-      (insert-file-contents cycle-path)
-      (string-trim (buffer-string)))))
+    (or (iar--read-file-string cycle-path)
+        (error "Cycle '%s' not found at %s" cycle-name cycle-path))))
 
 (defun iar--cycle-for-personality (personality-name)
   "Return the default cycle name for PERSONALITY-NAME.

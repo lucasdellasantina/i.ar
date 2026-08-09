@@ -59,45 +59,4 @@ retention, configure external log rotation (e.g., logrotate) instead."
   :safe #'iar--positive-integer-or-nil-p
   :group 'iar)
 
-;; =============================================================================
-;; Debug / Status Mode Parameters
-;; =============================================================================
-
-(defcustom iar-buffer-warn-size (* 5 1024 1024)
-  "Buffer size (in characters) that triggers a warning message.
-When the conversation buffer exceeds this size, a warning is
-displayed before each gptel-send.  This does not stop the send --
-it only provides visibility.
-
-Default is 5MB (5,242,880 chars), roughly 1.3M tokens.  This is a
-high threshold chosen to avoid false positives in long legitimate
-sessions.  Lower it if you want earlier warnings.
-
-Set to nil or 0 to disable the warning."
-  :type '(choice (integer :tag "Warning threshold (chars)")
-                 (const :tag "No warning" nil))
-  :safe #'iar--positive-integer-or-nil-p
-  :group 'iar)
-
-(defcustom iar-buffer-hard-cap nil
-  "Buffer size (in characters) that triggers a hard abort of gptel-send.
-When the conversation buffer exceeds this size, the send is
-aborted with an error to prevent the catastrophic cascade of
-sending enormous payloads to Ollama on every retry.
-
-This is the defense-in-depth against the laptop crash on
-2026-07-12: unbounded buffer growth + gptel sending the full
-buffer per turn caused CPU/IO saturation at 139MB/s network
-traffic.
-
-Default is nil (disabled).  Set to an integer (e.g., 20MB =
-20971520) to enable the hard cap.
-
-The hard cap should be significantly larger than the warning
-threshold to avoid aborting legitimate long sessions."
-  :type '(choice (integer :tag "Hard cap (chars)")
-                 (const :tag "No hard cap" nil))
-  :safe #'iar--positive-integer-or-nil-p
-  :group 'iar)
-
 (provide 'iar-config-debug)

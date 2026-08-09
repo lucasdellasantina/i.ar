@@ -8,6 +8,8 @@
 ;; Consolidates:
 ;; - Agent name resolution (was duplicated in iar-audit-log, iar-buffer-monitor,
 ;;   iar-request-logger, iar-fsm-tracer, task_tools, iar-reload-tools)
+;; - File reading helpers (was duplicated in read_task, read_knowledge,
+;;   read_roadmap, read_history, prompt-loader, prompt-assembly)
 ;; - Approximate token counting (was duplicated in iar-knowledge-loader,
 ;;   iar-buffer-monitor)
 ;; - Audit log path (was duplicated in iar-audit-log, iar-buffer-monitor)
@@ -78,6 +80,33 @@ to the expanded path and checks against the truename of BASE-DIR."
     (if (string-prefix-p base-real path-real)
         path
       (error "Path traversal attempt blocked: '%s' escapes '%s'" path base-dir))))
+
+;;; --- File reading helpers ---
+
+(defun iar--read-file-string (filepath)
+  "Read FILEPATH and return its trimmed contents as a string.
+Returns nil if the file does not exist."
+  (when (file-exists-p filepath)
+    (with-temp-buffer
+      (insert-file-contents filepath)
+      (string-trim (buffer-string)))))
+
+(defun iar--read-description-org (dir)
+  "Read the description.org file in DIR.
+Returns the trimmed content as a string, or nil if not found."
+  (iar--read-file-string (expand-file-name "description.org" dir)))
+
+(defun iar--dirs-with-description (dir)
+  "Return a list of subdirectory paths in DIR that contain a description.org.
+Only subdirectories with a description.org file are included.
+Sorted alphabetically.  Hidden directories (starting with .) are excluded."
+  (let (entries)
+    (when (file-directory-p dir)
+      (dolist (entry (directory-files dir t "^[^.]" t))
+        (when (and (file-directory-p entry)
+                   (file-exists-p (expand-file-name "description.org" entry)))
+          (push entry entries))))
+    (nreverse (sort entries #'string<))))
 
 ;;; --- Approximate token counting ---
 
